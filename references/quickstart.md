@@ -1,15 +1,17 @@
-# Quickstart — pip install to first run
+# Quickstart — install to first run
 
 Use this reference when the user is starting fresh: no `project.yml`, no `.zymi/`, no scaffold.
 
 ## Install
 
 ```bash
-pip install zymi-core
+uv tool install zymi-core    # puts `zymi` on PATH globally
 zymi --version
 ```
 
-The Python package is `zymi-core`; the import is `zymi` (`from zymi import tool`); the CLI is `zymi`. There is also a Rust crate of the same name for non-Python consumers — pip is the primary product.
+The Python package is `zymi-core`; the import is `zymi` (`from zymi import tool`); the CLI is `zymi`. There is also a Rust crate of the same name for non-Python consumers — PyPI is the primary product.
+
+Don't have `uv`? Install it once with `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or `irm https://astral.sh/uv/install.ps1 | iex` (Windows). `pip install zymi-core` into a traditional venv also works for contributor workflows, but `uv tool install` is what the shipped UX expects.
 
 ## Scaffold a project
 
@@ -24,6 +26,8 @@ cd my-agent
 - `agents/default.yml` — one starter agent with a small tool list
 - `pipelines/main.yml` — one starter pipeline calling the default agent
 - `AGENTS.md` — conventions doc for any agent (human or AI) working inside this project
+- `pyproject.toml` — Python deps for this project (`zymi-core` plus any libraries your `@tool` files import). Edit this when you add a new Python dep, then rerun `zymi fetch`.
+- `.python-version` — pinned Python minor for `uv` (3.12 by default; safe to change to any 3.9+).
 - `.env.example` — environment variables the scaffold expects
 
 Two scaffolds ship. The minimal one (one agent, one pipeline, no LLM provider configured) is the default — `zymi init my-agent` lays it down. For a full Telegram chat bot with an approval-gated `broadcast` tool, a commented MCP filesystem example, and Telegram inbound + outbound + approval channel, pass `--example telegram`:
@@ -33,6 +37,16 @@ zymi init my-agent --example telegram
 ```
 
 `zymi init` accepts `-n/--name` to override the project name and `--example <name>` to pick a non-default scaffold; `telegram` is currently the only named example.
+
+## Build the project venv
+
+```bash
+zymi fetch
+```
+
+`zymi fetch` wraps `uv sync`: it reads `pyproject.toml` + `.python-version`, fetches the right Python interpreter if missing, and materialises `./.venv/` with `zymi-core` plus any Python deps your `@tool` files need. It also writes a `uv.lock` for reproducible deploys. Pipeline-run commands (`zymi run`, `zymi serve`, `zymi resume`) automatically re-exec inside this venv when it exists (ADR-0032), so `@tool` imports resolve against the project's own deps rather than the global tool env.
+
+Rerun `zymi fetch` whenever you add or upgrade a dep in `pyproject.toml`.
 
 ## Set the LLM provider
 
@@ -52,6 +66,8 @@ Both providers are first-class — pick by the user's API key. zymi reads `${env
 ```bash
 zymi run main -i task="Summarise what zymi is in 3 bullets"
 ```
+
+(`zymi run` will transparently hop into `./.venv` if `zymi fetch` has been run; the user does not need any `uv run` prefix or `source .venv/bin/activate` step.)
 
 `main` is the pipeline name (filename stem of `pipelines/main.yml`). `-i task=...` sets `${inputs.task}`. The CLI prints the final output and the stream-id of the run.
 

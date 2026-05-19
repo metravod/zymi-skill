@@ -1,6 +1,6 @@
 ---
 name: zymi-skill
-description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed as `pip install zymi-core`). Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi observe`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring, approvals, context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the four tool kinds, MCP and HTTP connectors, event-sourced approvals, context-window tuning, and observability."
+description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`). Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring, approvals, context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the four tool kinds, MCP and HTTP connectors, event-sourced approvals, context-window tuning, observability, and the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032)."
 metadata:
   version: "0.1.0"
   scope: "zymi-core-pip-user"
@@ -36,17 +36,30 @@ Do **not** activate for generic single-turn Q&A unrelated to zymi.
 If you're not sure what the project looks like yet, run a fast inventory before suggesting anything:
 
 ```bash
-ls project.yml pipelines/ agents/ tools/ .zymi/  2>/dev/null
+ls project.yml pyproject.toml pipelines/ agents/ tools/ .venv/ .zymi/  2>/dev/null
 zymi pipelines    # if zymi is installed; lists pipelines + their inputs
 ```
 
-This tells you whether the project exists, which pipelines are defined, and where to attach new work. Avoid suggesting `zymi init` in an already-initialized directory.
+This tells you whether the project exists, which pipelines are defined, whether a `.venv` has been built (`zymi fetch` was run), and where to attach new work. Avoid suggesting `zymi init` in an already-initialized directory.
+
+## Install model (ADR-0032)
+
+The shipped UX is a thin global CLI plus per-project venvs:
+
+```bash
+uv tool install zymi-core    # one-time per machine; puts `zymi` on PATH globally
+zymi init                    # scaffolds project.yml + pyproject.toml + .python-version
+zymi fetch                   # `uv sync` under the hood — builds ./.venv from pyproject.toml
+zymi serve <pipeline>        # transparently re-execs inside ./.venv/bin/zymi if present
+```
+
+When the user adds a Python `@tool` that imports a third-party library, the dep belongs in **their project's `pyproject.toml`**, not the global tool env. After editing, they rerun `zymi fetch`. Re-exec can be bypassed for contributor workflows with `--no-venv`. `pip install zymi-core` into a traditional venv remains supported but is no longer the default user path.
 
 ## How to use this skill
 
 Load references on demand, not all up front:
 
-- **[references/quickstart.md](references/quickstart.md)** — `pip install zymi-core` → `zymi init` → first run end-to-end. Load when the user is starting fresh.
+- **[references/quickstart.md](references/quickstart.md)** — `uv tool install zymi-core` → `zymi init` → `zymi fetch` → first run end-to-end. Load when the user is starting fresh.
 - **[references/pipelines.md](references/pipelines.md)** — pipeline YAML schema, agent steps vs deterministic tool steps, `when:` branching, `any_of` outputs, fresh context, fork/resume. Load when the user is designing or editing a pipeline.
 - **[references/tools.md](references/tools.md)** — the four tool kinds (declarative, Python `@tool`, MCP, builtin), when to pick which, schema introspection, `requires_approval`, `no_resume`. Load when adding a new capability.
 - **[references/mcp-and-connectors.md](references/mcp-and-connectors.md)** — MCP servers, HTTP inbound/outbound, cron, file/stdin connectors. Load when wiring external systems.

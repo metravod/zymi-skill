@@ -1,6 +1,6 @@
 # zymi-skill
 
-> An opinionated Agent Skill for building, scaffolding, and debugging agents with [zymi-core](https://github.com/metravod/zymi-core) — the event-sourced agent engine distributed as `pip install zymi-core`.
+> An opinionated Agent Skill for building, scaffolding, and debugging agents with [zymi-core](https://github.com/metravod/zymi-core) — the event-sourced agent engine distributed via `uv tool install zymi-core` (with a per-project `pyproject.toml` + `zymi fetch` for project-scoped Python deps).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Agent Skill](https://img.shields.io/badge/Agent-Skill-7c3aed)](SKILL.md)
@@ -14,9 +14,9 @@ Drop this skill into your agent and asking it to "build an agent with zymi", "ad
 
 The skill activates on:
 
-- mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi observe`;
+- mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`;
 - imports of `zymi` or `from zymi import tool` in Python;
-- edits to `project.yml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`;
+- edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`;
 - working directories that contain `project.yml` and/or `.zymi/`.
 
 ## Install
@@ -62,7 +62,7 @@ Install the zymi-skill skill for me:
 ```text
 SKILL.md                          # activation rules + decision tree + non-negotiables
 references/
-  quickstart.md                   # pip install → zymi init → first run
+  quickstart.md                   # uv tool install → zymi init → zymi fetch → first run
   pipelines.md                    # pipeline YAML schema, branching, fresh context
   tools.md                        # the 4 tool kinds, approvals, no_resume
   mcp-and-connectors.md           # MCP servers, inbound connectors, outbound outputs
@@ -86,7 +86,7 @@ The skill version (in `SKILL.md` frontmatter) tracks the zymi-core minor version
 
 Issues and PRs welcome. Two ground rules:
 
-1. Examples must run against current `pip install zymi-core` — no aspirational APIs.
+1. Examples must run against current `uv tool install zymi-core` — no aspirational APIs.
 2. Don't grow the skill body for completeness — keep `SKILL.md` tight and push detail into `references/`.
 
 ## License
