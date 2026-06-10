@@ -1,12 +1,15 @@
 # MCP and connectors
 
-zymi has three external-system surfaces. They are not interchangeable — pick by direction and shape.
+zymi has four external-system surfaces. They are not interchangeable — pick by direction and shape.
 
 | Surface | Direction | What it carries |
 |---|---|---|
 | `mcp_servers:` | Pulled by an agent during a turn | Tools (Pinecone, GitHub, filesystem, …) |
 | `connectors:` | Pushed _into_ a pipeline | Inbound events (Telegram messages, cron ticks, files, stdin) |
 | `outputs:` | Pushed _out_ of a pipeline | Outbound side effects (HTTP POST, file append, stdout) |
+| `zymi mcp serve` | Pulled by an **external** agent | This project's pipelines, exposed as MCP tools — see references/zymi-as-mcp-server.md |
+
+This file covers the first three (zymi consuming the outside world). The server direction — another agent calling zymi pipelines — lives in **references/zymi-as-mcp-server.md**.
 
 ## MCP servers
 

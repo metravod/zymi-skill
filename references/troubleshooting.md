@@ -110,6 +110,30 @@ After the change, look for `ContextCompacted` events in the run — those confir
 
 **Fix.** Switch to `output: any_of: [a, b, …]` listing every legitimate terminal arm in priority order. The first non-skipped survivor becomes the answer. If _every_ candidate was skipped, the run still fails loud — that's the correct behaviour.
 
+## MCP host times out calling my pipeline tool
+
+**Symptom.** A pipeline exposed via `zymi mcp serve` works under `zymi run`, but the host (Claude Code, Cursor) reports a tool timeout mid-run — usually during a long deterministic step (test suite, build).
+
+**Cause.** A plain `tools/call` blocks until the pipeline terminates; the deadline that fires is the **host's** per-tool-call timeout, not anything in zymi.
+
+**Fix.** Raise the host's timeout (Claude Code: `MCP_TOOL_TIMEOUT`, in ms, in the host's environment), or — if the host supports SEP-1686 tasks — have the caller task-augment the call so it returns a task handle immediately. `mode: async` on the exposure is the hint for that. See references/zymi-as-mcp-server.md.
+
+## Approval denies immediately under `zymi mcp serve`
+
+**Symptom.** A `requires_approval: true` tool worked with a telegram/terminal channel, but over MCP the action is denied instantly — no form, no prompt.
+
+**Cause.** The connected MCP client doesn't advertise `capabilities.elicitation`, and the elicitation approval bridge **fails closed**: `ApprovalDenied { reason: "client_no_elicitation" }`.
+
+**Fix.** Use an elicitation-capable host (Claude Code ≥ 2.1.76 renders the approve/deny form natively), or declare a non-elicitation channel (`telegram`, `http`) in `project.yml::approvals:` + `default_approval_channel:` — project-declared channels run as configured under serve.
+
+## `requires_approval: true` never prompts
+
+**Symptom.** A tool is marked `requires_approval: true`, the channel is configured, but the tool executes silently with no `ApprovalRequested` in the event log.
+
+**Cause (historical, fixed in 0.7.0).** The per-tool flag was dead before zymi-core 0.7.0: it parsed but never gated HTTP/Python/MCP tools, and shell tools gated only via the policy allowlist.
+
+**Fix.** Upgrade to ≥ 0.7.0 (`uv tool upgrade zymi-core`, then rerun `zymi fetch` in the project so the venv picks it up). On ≥ 0.7.0 the explicit flag forces a human approval round-trip for every tool kind.
+
 ## "Tool returned not configured"
 
 **Symptom.** `web_search` or `web_scrape` returns `"not configured"` literal string and the agent often hallucinates around it.

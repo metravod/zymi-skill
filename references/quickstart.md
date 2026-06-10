@@ -138,3 +138,4 @@ The scaffold sets defaults that fit a coding-style agent. For a chat bot, overri
 - "I want the agent to hit an API" → references/tools.md (declarative HTTP) or references/mcp-and-connectors.md if the API has a published MCP server.
 - "I want to react to incoming messages" → references/mcp-and-connectors.md, `connectors:` section.
 - "I want a human to approve before X happens" → references/tools.md "Approvals" + references/pipelines.md "approval_channel".
+- "I want Claude Code / another agent to run this pipeline" → references/zymi-as-mcp-server.md (`expose.mcp:` + `zymi mcp serve`).

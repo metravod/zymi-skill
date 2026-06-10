@@ -1,8 +1,8 @@
 ---
 name: zymi-skill
-description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`). Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring, approvals, context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the four tool kinds, MCP and HTTP connectors, event-sourced approvals, context-window tuning, observability, and the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032)."
+description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`), or exposing zymi pipelines as MCP tools to another agent. Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`, `zymi mcp serve`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring (either direction), approvals, context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the four tool kinds, MCP client and server (`expose.mcp:`, SEP-1686 tasks, elicitation approvals, `zymi.runs.*` introspection), HTTP connectors, event-sourced approvals, context-window tuning, observability, and the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032)."
 metadata:
-  version: "0.1.0"
+  version: "0.7.0"
   scope: "zymi-core-pip-user"
   file_policy: "markdown-only"
 ---
@@ -13,11 +13,12 @@ Use this skill when the user is building or operating an agent **with zymi-core*
 
 ## Core stance
 
-zymi is an event-sourced engine. The model proposes; the YAML defines the plan; the runtime appends events. Three load-bearing consequences:
+zymi is an event-sourced engine. The model proposes; the YAML defines the plan; the runtime appends events. Four load-bearing consequences:
 
 1. **The pipeline YAML _is_ the plan.** Do not generate procedural Python loops to orchestrate agents. Add steps to `pipelines/<name>.yml`, connect them with `depends_on`, branch with `when:`, terminate with `output:`.
 2. **Every tool call is an event.** Observability is free — `zymi observe` (TUI) and `zymi events` (CLI) read the same event log the runtime writes. Do not reinvent logging.
 3. **Approvals are event-sourced.** Never gate side effects with `input()` or ad-hoc HTTP. Set `requires_approval: true` on the tool and configure a channel in `project.yml::approvals:`. The runtime publishes `ApprovalRequested` and waits.
+4. **Pipelines are MCP tools (≥0.7.0).** A pipeline that declares `expose.mcp:` becomes a callable tool for any MCP host (Claude Code, Cursor, OpenHands, …) via `zymi mcp serve` — audit trail, approval gates, and introspection included. When another agent needs to trigger zymi work, expose a pipeline; don't write glue code.
 
 ## When to activate
 
@@ -27,7 +28,8 @@ Activate on any of:
 - user imports `zymi` or `from zymi import tool` in Python;
 - user edits `project.yml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`;
 - working directory contains `project.yml` and/or `.zymi/`;
-- user asks to "build an agent with zymi", "add a tool", "wire MCP", "scaffold a pipeline", "add approvals", "tune the context window", "resume from event N".
+- user asks to "build an agent with zymi", "add a tool", "wire MCP", "scaffold a pipeline", "add approvals", "tune the context window", "resume from event N";
+- user wants another agent (Claude Code, Cursor, OpenHands, …) to call a zymi pipeline — "expose this pipeline", "zymi mcp serve", "pipeline as a tool".
 
 Do **not** activate for generic single-turn Q&A unrelated to zymi.
 
@@ -62,7 +64,8 @@ Load references on demand, not all up front:
 - **[references/quickstart.md](references/quickstart.md)** — `uv tool install zymi-core` → `zymi init` → `zymi fetch` → first run end-to-end. Load when the user is starting fresh.
 - **[references/pipelines.md](references/pipelines.md)** — pipeline YAML schema, agent steps vs deterministic tool steps, `when:` branching, `any_of` outputs, fresh context, fork/resume. Load when the user is designing or editing a pipeline.
 - **[references/tools.md](references/tools.md)** — the four tool kinds (declarative, Python `@tool`, MCP, builtin), when to pick which, schema introspection, `requires_approval`, `no_resume`. Load when adding a new capability.
-- **[references/mcp-and-connectors.md](references/mcp-and-connectors.md)** — MCP servers, HTTP inbound/outbound, cron, file/stdin connectors. Load when wiring external systems.
+- **[references/mcp-and-connectors.md](references/mcp-and-connectors.md)** — MCP servers (zymi as client), HTTP inbound/outbound, cron, file/stdin connectors. Load when wiring external systems *into* zymi.
+- **[references/zymi-as-mcp-server.md](references/zymi-as-mcp-server.md)** — `zymi mcp serve` (zymi as MCP server): `expose.mcp:`, host wiring, SEP-1686 tasks for long pipelines, elicitation approval forms, `zymi.runs.*` introspection tools. Load when another agent should call zymi pipelines.
 - **[references/observability.md](references/observability.md)** — `zymi observe`, `zymi events`, hash chain, `runs`, `verify`, fork-resume, event store backends. Load when debugging, auditing, or replaying.
 - **[references/troubleshooting.md](references/troubleshooting.md)** — known papercuts and recoveries. Load when something looks wrong.
 
@@ -81,6 +84,9 @@ Load references on demand, not all up front:
 | Wipe context before a step (long-running goal loops, ETL fans) | `context: { mode: fresh }` on the step (ADR-0031) |
 | Long conversational session that blows out the prompt | Tune `runtime.context:` — see references/pipelines.md "chat profile" |
 | Human approves an action before it fires | `requires_approval: true` on the tool + `approvals:` channel in `project.yml` |
+| Let another agent (Claude Code, Cursor, …) call a pipeline as a tool | `expose.mcp:` in the pipeline YAML + `zymi mcp serve` — see references/zymi-as-mcp-server.md |
+| Pipeline runs minutes/hours when called over MCP | `mode: async` hint + SEP-1686 task-augmented calls; or raise the host's per-call timeout |
+| Connected agent debugs its own zymi runs from inside the host | `zymi mcp serve --expose-observability` → `zymi.runs.list/get/events/step_io` |
 | Watch the agent live | `zymi observe` (TUI run picker) or `zymi observe -r <stream-id>` |
 | Reconstruct what happened after the fact | `zymi events --stream <id>` (add `--raw` for JSON-per-line) |
 | Re-run from step N with edits | `zymi resume <stream-id> --from-step <id>` |
@@ -126,6 +132,9 @@ Anything else (Pinecone, GitHub, filesystem with full access, weather, translate
 - A `kind: agent` step that calls a `requires_approval: true` tool will pause the whole pipeline (correctly) — make sure the approval channel is configured before testing, otherwise the run hangs without explanation.
 - `context.mode: fresh` (ADR-0031) wipes Layer A (observation history) for the step that declares it, not for downstream steps. It is not a global reset.
 - Resume re-fires every tool call in the re-executed subgraph unless the tool was registered `no_resume=True`. For real send-email / send-money tools, set the flag; the runtime then emits a synthetic placeholder result instead of calling out.
+- Under `zymi mcp serve`, a sync pipeline with a long deterministic step (test suite, build) hits the **host's** per-tool-call timeout, not zymi's. Raise it (Claude Code: `MCP_TOOL_TIMEOUT`) or have the caller task-augment the call (SEP-1686).
+- Under `zymi mcp serve`, approval gates **fail closed** when the connected client doesn't support elicitation: `ApprovalDenied { reason: "client_no_elicitation" }`, not a hang. A "mysterious deny" usually means the host lacks elicitation support, not a broken channel.
+- Per-tool `requires_approval: true` was a dead flag before zymi-core 0.7.0 — it parsed but never gated HTTP/Python/MCP tools. If approvals don't fire at all, check the version first.
 
 ## Source links
 

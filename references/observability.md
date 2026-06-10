@@ -89,6 +89,10 @@ sqlite3 .zymi/events.db 'PRAGMA wal_checkpoint(FULL);'
 
 Then re-run `zymi events`. See references/troubleshooting.md.
 
+## Introspection over MCP (`zymi.runs.*`)
+
+The same trace is reachable by a *connected agent* — no terminal needed. `zymi mcp serve --expose-observability` adds four read-only tools (`zymi.runs.list` / `get` / `events` / `step_io`) so the agent that invoked a pipeline can investigate its own run from inside the host conversation. Scope defaults to runs the serve process started (`--observability-scope all` opens the whole store). Details and the narrow-before-deepen calling discipline: references/zymi-as-mcp-server.md.
+
 ## What's _not_ in the event log
 
 - Hidden reasoning / chain of thought. zymi traces operational events, not the model's internal monologue. If a provider returns a thinking block, it's stored on the assistant message, not as a separate event.

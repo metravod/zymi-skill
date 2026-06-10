@@ -1,6 +1,6 @@
 # zymi-skill
 
-> An opinionated Agent Skill for building, scaffolding, and debugging agents with [zymi-core](https://github.com/metravod/zymi-core) — the event-sourced agent engine distributed via `uv tool install zymi-core` (with a per-project `pyproject.toml` + `zymi fetch` for project-scoped Python deps).
+> An opinionated Agent Skill for building, scaffolding, and debugging agents with [zymi-core](https://github.com/metravod/zymi-core) — the event-sourced agent engine distributed via `uv tool install zymi-core` (with a per-project `pyproject.toml` + `zymi fetch` for project-scoped Python deps). Covers both directions of MCP: zymi consuming MCP servers, and zymi pipelines exposed as MCP tools to any agent via `zymi mcp serve`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Agent Skill](https://img.shields.io/badge/Agent-Skill-7c3aed)](SKILL.md)
@@ -14,10 +14,11 @@ Drop this skill into your agent and asking it to "build an agent with zymi", "ad
 
 The skill activates on:
 
-- mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`;
+- mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`, `zymi mcp serve`;
 - imports of `zymi` or `from zymi import tool` in Python;
 - edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`;
-- working directories that contain `project.yml` and/or `.zymi/`.
+- working directories that contain `project.yml` and/or `.zymi/`;
+- requests to expose a pipeline as a tool for another agent (Claude Code, Cursor, OpenHands, …).
 
 ## Install
 
@@ -65,7 +66,8 @@ references/
   quickstart.md                   # uv tool install → zymi init → zymi fetch → first run
   pipelines.md                    # pipeline YAML schema, branching, fresh context
   tools.md                        # the 4 tool kinds, approvals, no_resume
-  mcp-and-connectors.md           # MCP servers, inbound connectors, outbound outputs
+  mcp-and-connectors.md           # MCP servers (zymi as client), inbound connectors, outbound outputs
+  zymi-as-mcp-server.md           # zymi mcp serve: expose.mcp, SEP-1686 tasks, elicitation approvals, zymi.runs.*
   observability.md                # zymi observe, zymi events, fork-resume, store backends
   troubleshooting.md              # known papercuts and recoveries
 ```
