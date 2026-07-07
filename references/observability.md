@@ -31,6 +31,17 @@ zymi events --stream <stream-id>   # full event log, CLI-friendly
 | `ResumeForked` | A `zymi resume` produced a new sub-stream forking off the parent |
 | `McpServerConnected` / `McpServerDisconnected` | MCP subprocess handshake / shutdown |
 
+## Token usage and cache telemetry (0.7.2+)
+
+`LlmCallCompleted` carries a `TokenUsage`. Since 0.7.2 it also reports prompt-cache counters, so `zymi events` surfaces them automatically (older events deserialize unchanged — the new fields are serde-defaulted):
+
+- `input_tokens` — normalised to **total** input across providers (Anthropic's API reports fresh tokens only; zymi adds the cached read back so the field means the same thing on Anthropic and OpenAI).
+- `cached_input_tokens` — cache hits (Anthropic `cache_read_input_tokens`, OpenAI `prompt_tokens_details.cached_tokens`).
+- `cache_creation_tokens` — tokens written into the cache this call.
+- `cache_hit_rate()` — `cached_input_tokens / input_tokens`.
+
+The `MetricsProjection` aggregate exposes `total_cached_input_tokens` and an overall `cache_hit_rate()` across the run. Use this to confirm a long-lived stable prefix is actually being cached rather than re-billed each turn — it's also the observable check for the ADR-0016 stable-prefix ordering invariant.
+
 ## "What just happened?" recipe
 
 ```bash

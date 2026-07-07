@@ -2,7 +2,7 @@
 name: zymi-skill
 description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`), or exposing zymi pipelines as MCP tools to another agent. Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`, `zymi mcp serve`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring (either direction), approvals, context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the four tool kinds, MCP client and server (`expose.mcp:`, SEP-1686 tasks, elicitation approvals, `zymi.runs.*` introspection), HTTP connectors, event-sourced approvals, context-window tuning, observability, and the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032)."
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
   scope: "zymi-core-pip-user"
   file_policy: "markdown-only"
 ---

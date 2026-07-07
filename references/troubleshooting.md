@@ -134,6 +134,22 @@ After the change, look for `ContextCompacted` events in the run — those confir
 
 **Fix.** Upgrade to ≥ 0.7.0 (`uv tool upgrade zymi-core`, then rerun `zymi fetch` in the project so the venv picks it up). On ≥ 0.7.0 the explicit flag forces a human approval round-trip for every tool kind.
 
+## Telegram approval channel refuses to start on a non-loopback bind
+
+**Symptom (0.8.0+, breaking).** A `telegram` approval channel that bound a public / non-loopback address and previously worked now hard-errors at startup, refusing to start.
+
+**Cause (ADR-0037).** The approval callback endpoint approves any pending action for whoever reaches it. Before 0.8.0 `secret_token` defaulted to `None` and nothing enforced it, so an off-host bind was an unauthenticated approve-anything hole. Now it **fails closed**: a non-loopback bind without a `secret_token` is a startup error; a loopback bind without one only logs a warning (fine for local dev / behind a tunnel).
+
+**Fix.** Set `secret_token:` on the telegram approval channel in `project.yml::approvals:`, or keep the recommended topology — bind loopback (`127.0.0.1`) and put a tunnel in front. No config **schema** changed; only this validation was added. (Relatedly in 0.8.0, a callback for an already-decided approval is now ignored — first decision wins — so the audit trail can't record two contradictory decisions for one request.)
+
+## Provider 401, or a config value arrives as the literal `${env.KEY}`
+
+**Symptom.** An LLM call fails with a cryptic provider 401 (bad API key), or a tool/connector receives the string `${env.SOMETHING}` verbatim instead of the resolved value.
+
+**Cause (behavior changed in 0.7.1, issue #9).** Before 0.7.1, if **any** `${env.*}` reference in `project.yml` was unset — even in an unused connector or output block — `load_project` swallowed the resolution error and fell back to the **raw YAML**. That sent literal `${env.KEY}` strings downstream for the whole file, including `llm.api_key`, which surfaced as a 401 with no hint about the real cause.
+
+**Fix.** Upgrade to ≥ 0.7.1. The first config pass is now env-only and **fails loudly**: a missing `${env.*}` is a hard error naming the variable and the file path. Set the variable (a `.env` file is picked up) or remove the dead reference. Note this pass only resolves `${env.*}` — `${var}`, `${project.*}`, `${inputs.*}` and other namespaces are still resolved in later passes and are unaffected.
+
 ## "Tool returned not configured"
 
 **Symptom.** `web_search` or `web_scrape` returns `"not configured"` literal string and the agent often hallucinates around it.
