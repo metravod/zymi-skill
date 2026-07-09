@@ -26,9 +26,9 @@ output:                     # which step is "the answer"
 approval_channel: ops_tg    # optional; overrides project's default_approval_channel
 ```
 
-## Two step kinds
+## Three step kinds
 
-Each step is **either** an agent step or a deterministic tool step. Declaring both, or neither, is a parse error.
+Each step is **exactly one** of an agent step, a deterministic tool step, or an ask step. Declaring more than one, or none, is a parse error.
 
 ### Agent step
 
@@ -58,6 +58,25 @@ Dispatches a tool directly with templated args, no LLM in the middle. The tool m
 Use when the work is deterministic glue: known input shape, known tool, no choice to make. Tool steps fail-fast (ADR-0027) — if the tool errors, the pipeline halts with non-zero exit. That is the contract; don't try to swallow errors.
 
 Templated args resolve `${inputs.*}`, `${steps.<id>.output}`, `${env.*}`, and project-level `${variables.*}` on string leaves, then convert to JSON for catalog dispatch.
+
+### Ask step (ADR-0042)
+
+Delegates a reasoning question to **whoever called the pipeline** instead of configuring a second, separately-billed model. The run parks, surfaces the (templated) prompt, and resumes with the answer as the step's `output` — the approval mechanism (ADR-0022) generalized from a *decision* to a *value*.
+
+```yaml
+- id: summarize
+  ask: "Summarize this deploy diff in two sentences:\n${steps.diff.output}"
+  channel: mcp_reasoning     # optional; defaults to the connected caller under
+                             # serve, else the zero-config terminal channel
+  depends_on: [diff]
+```
+
+Use when the caller "could just answer this" (*summarize this*, *does this look right?*) and it's already a capable model. Key properties:
+
+- **No `llm:` needed.** An `ask:` step does not count toward ADR-0041's "needs a provider" check — a pure tool + ask pipeline builds model-free.
+- **Who answers:** under `zymi mcp serve`, the connected agent (the task goes `input_required` with `{ prompt, resume_token }`; the caller reasons and calls `zymi/reasoning/resume` — see references/zymi-as-mcp-server.md). Under `zymi run` / `zymi resume`, a human at the terminal or a configured reasoning channel.
+- **Fails closed**, never a silent fallback to an HTTP model. Prompt + answer are recorded (`ReasoningRequested` / `ReasoningAnswered`), so replay reads the answer back and never re-asks (byte-identical).
+- **The answer is untrusted** — model-generated free text. It flows to downstream `${steps.<id>.output}` through the *same* path as any tool output, so the same sink guards apply. Don't splice it into a raw `execute_shell_command` any more than you would a tool output.
 
 ## Interpolation
 

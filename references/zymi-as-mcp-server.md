@@ -1,6 +1,6 @@
 # zymi as an MCP server — pipelines as tools for any agent
 
-Load this reference when the user wants an external agent (Claude Code, Claude Desktop, Cursor, Windsurf, OpenHands, LangGraph, …) to **invoke zymi pipelines as tools**, or asks about `zymi mcp serve`, `expose:`, approval forms popping in the host, or `zymi.runs.*` introspection.
+Load this reference when the user wants an external agent (Claude Code, Claude Desktop, Cursor, Windsurf, OpenHands, LangGraph, …) to **invoke zymi pipelines as tools**, or asks about `zymi mcp serve`, `expose:`, approval forms popping in the host, reasoning delegation (`ask:` steps / `zymi/reasoning/resume`), or `zymi.runs.*` introspection.
 
 Requires **zymi-core ≥ 0.7.0**.
 
@@ -89,6 +89,24 @@ Routing rules under `zymi mcp serve`:
 
 Note: per-tool `requires_approval: true` was a dead flag before 0.7.0 (it parsed but never gated HTTP/Python/MCP tools). If approval gates don't fire at all, check the zymi version before debugging the channel.
 
+## Reasoning delegation — `ask:` steps over MCP (ADR-0042)
+
+Where the elicitation bridge borrows the caller's *human*, an [`ask:` step](pipelines.md#ask-step-adr-0042) borrows the caller's *model*. A pipeline exposed over `zymi mcp serve` can hand a reasoning question back to the connected agent instead of configuring a second `llm:` — *summarize this diff*, *does this output look right?* — and the agent answers from its own loop.
+
+Crucially this is **not** MCP `sampling` (deprecated, SEP-2577) and **not** elicitation (that returns human form data). It rides the SEP-1686 task + resume surface — plain request/response tools:
+
+1. The caller **task-augments** the `tools/call` (this is required — a sync call can't answer a reasoning question, there's no one to ask mid-blocking-call).
+2. When the run hits the `ask:` step it parks; the task goes **`input_required`**, and `tasks/get` carries an `inputRequest` payload: `{ status: "needs_reasoning", prompt, resume_token }`.
+3. The caller reads the prompt, **reasons in its own loop**, and calls the method **`zymi/reasoning/resume`** with `{ resume_token, answer }`.
+4. The server publishes `ReasoningAnswered`, the parked run resumes with `answer` as the step output, and the task proceeds to `completed` (or the next `input_required`).
+
+Properties to know:
+
+- **`resume_token` is opaque + signed + expiring.** Don't inspect or mutate it — echo it back verbatim. A tampered or expired token is rejected (`resume rejected: …`). If the caller never resumes, the parked step fails closed on the timeout (it does not hang forever).
+- **Sync calls can't do reasoning delegation.** An `ask:` step only works on a task-augmented call. On a plain sync `tools/call` there's no channel to answer under serve, so it fails closed. (This is the mirror of "async tasks don't pause for *approvals*" — approvals are sync-only via elicitation; reasoning is task-only via resume.)
+- **The answer is untrusted model output** re-entering zymi as a step output — the ordinary sink guards apply downstream (see pipelines.md). Design the pipeline so an `ask:` answer feeding a shell/HTTP/file sink goes through a guarded tool, not a raw `execute_shell_command`.
+- **A pure tool + ask pipeline needs no `llm:`** (ADR-0041), which is the point: the model lives on the other end of the MCP connection.
+
 ## Self-introspection: `zymi.runs.*` (opt-in)
 
 With `--expose-observability`, the connected agent can investigate its own runs without anyone switching to a terminal:
@@ -110,6 +128,7 @@ This surface is what makes "the pipeline failed" debuggable inside the host conv
 - **Startup latency is on you now.** `zymi mcp serve` is a long-lived child process of the host; slow boot is exactly what we complain about in third-party MCP servers. Keep project load lean; don't put network calls in module-level Python tool code.
 - **Loose `inputs:` = bad agent behavior.** The agent only sees what `tools/list` shows. If the agent passes garbage, fix the input schema (types + descriptions) before blaming the agent.
 - **Approval hangs vs denies.** Under `zymi run`/`zymi serve` a missing approval channel makes the run *hang* on `ApprovalRequested`; under `zymi mcp serve` a non-elicitation client makes it *deny* fail-closed. Different symptoms, same root area — read the event log.
+- **`ask:` needs a task-augmented call.** If an exposed pipeline with an `ask:` step "does nothing / fails closed" under serve, check that the caller task-augmented the `tools/call` — a plain sync call has no way to answer a reasoning question and fails closed. The caller must poll `tasks/get`, read the `inputRequest.resume_token`, and call `zymi/reasoning/resume`.
 
 ## Real-world example
 
