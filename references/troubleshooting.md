@@ -158,6 +158,10 @@ Since 0.9.1, when the cwd has no `project.yml` the CLI falls back to the home pr
 
 The project names a provider (`llm: <name>`) that `~/.zymi/providers.yml` doesn't define, or whose `${env.*}` key is unset. That only disables agent steps — tool-only pipelines keep working by design. Fix the name, or put the key in `~/.zymi/.env`.
 
+## LLM call fails after ~60s: "connection closed … without a response"
+
+A proxy in front of the model (nginx `proxy_read_timeout`, Cloudflare, a corporate gateway) resets requests that haven't answered within its idle limit. Long or reasoning-heavy generations hit it. Set `stream: true` on the provider (zymi ≥0.9.2, OpenAI-compatible providers): tokens flow while the model writes, so the connection never idles. Before 0.9.2 the same failure printed only `error sending request for url (…)`, and the run stayed "running" in `zymi runs`.
+
 ## Every shell command asks for approval
 
 `policy:` is absent or `enabled: false` — a disabled policy means "approve everything". Enable it and list the commands in `allow:`. A command that still prompts usually contains a `$` from an unresolved template.
