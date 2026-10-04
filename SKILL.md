@@ -1,8 +1,8 @@
 ---
 name: zymi-skill
-description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`), or exposing zymi pipelines as MCP tools to another agent. Activates on mentions of `zymi`, `zymi run`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`, `zymi mcp serve`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring (either direction), approvals, reasoning delegation (`ask:` steps), context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the three pipeline step kinds (agent / deterministic tool / ask), the four tool kinds, MCP client and server (`expose.mcp:`, SEP-1686 tasks, elicitation approvals, reasoning delegation via `ask:` steps + `zymi/reasoning/resume`, `zymi.runs.*` introspection), HTTP connectors, event-sourced approvals, context-window tuning, observability, and the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032)."
+description: "Use this skill when the user is building, scaffolding, debugging, or auditing an agent with zymi-core (the event-sourced agent engine distributed via `uv tool install zymi-core` or `pip install zymi-core`), or exposing zymi pipelines as MCP tools to another agent. Activates on mentions of `zymi`, `zymi run`, `zymi ls`, `zymi serve`, `zymi init`, `zymi fetch`, `zymi observe`, `zymi mcp serve`, `~/.zymi`; on imports of `zymi` / `from zymi import tool`; on edits to `project.yml`, `providers.yml`, `pyproject.toml`, `pipelines/*.yml`, `agents/*.yml`, `tools/*.yml`, `tools/*.py`; and on questions about zymi pipelines, tools, MCP wiring (either direction), approvals, reasoning delegation (`ask:` steps), context window, fork/resume, events store, or `zymi` CLI. Covers the declarative YAML surface, the three pipeline step kinds (agent / deterministic tool / ask), the four tool kinds, MCP client and server (`expose.mcp:`, SEP-1686 tasks, elicitation approvals, reasoning delegation via `ask:` steps + `zymi/reasoning/resume`, `zymi.runs.*` introspection), HTTP connectors, event-sourced approvals, context-window tuning, observability, the `uv tool install` + `zymi fetch` + per-project `.venv` install model (ADR-0032), and the personal home project `~/.zymi` with named LLM providers (ADR-0044)."
 metadata:
-  version: "0.8.0"
+  version: "0.9.1"
   scope: "zymi-core-pip-user"
   file_policy: "markdown-only"
 ---
@@ -39,8 +39,11 @@ If you're not sure what the project looks like yet, run a fast inventory before 
 
 ```bash
 ls project.yml pyproject.toml pipelines/ agents/ tools/ .venv/ .zymi/  2>/dev/null
-zymi pipelines    # if zymi is installed; lists pipelines + their inputs
+zymi ls           # compact: name, description, inputs (* = required)
+zymi pipelines    # step-level view
 ```
+
+Outside any project, both list the **home project** `~/.zymi` (see below) — so `zymi ls` from `~` answers "what personal pipelines exist".
 
 This tells you whether the project exists, which pipelines are defined, whether a `.venv` has been built (`zymi fetch` was run), and where to attach new work. Avoid suggesting `zymi init` in an already-initialized directory.
 
@@ -56,6 +59,24 @@ zymi serve <pipeline>        # transparently re-execs inside ./.venv/bin/zymi if
 ```
 
 When the user adds a Python `@tool` that imports a third-party library, the dep belongs in **their project's `pyproject.toml`**, not the global tool env. After editing, they rerun `zymi fetch`. Re-exec can be bypassed for contributor workflows with `--no-venv`. `pip install zymi-core` into a traditional venv remains supported but is no longer the default user path.
+
+## Home project — a personal pipeline library (ADR-0044, ≥0.9.1)
+
+`$ZYMI_HOME` (default `~/.zymi`) is an ordinary zymi project that commands fall back to. Resolution for every project-scoped command: `--dir` → cwd if it has `project.yml` → `~/.zymi` if it has one (announced on stderr) → cwd. Use it for the user's **personal ops procedures** (add a VPN user, check the fleet, deploy) — anything they should be able to run from any terminal, *without an agent*.
+
+```bash
+zymi init --home          # lean scaffold: no agent pipeline, enabled shell policy, providers.yml, .env.example
+zymi ls                   # from anywhere
+zymi run <name>           # missing inputs are asked interactively on a TTY
+```
+
+- **`.env` layering:** project → cwd → `~/.zymi/.env`, earlier wins, real env wins over all. Machine-wide keys go in `~/.zymi/.env`.
+- **Named providers:** `~/.zymi/providers.yml` maps a name to `provider/base_url/model/api_key`; any project says `llm: <name>` or `llm: { use: <name>, model: other }`. A reference that can't be resolved (unknown name, unset key) does **not** break the project — tool-only pipelines still run, only agent steps report the cause. Inline `llm:` stays the portable form.
+- **`zymi run` judges the LLM requirement per pipeline**: a tool-only pipeline runs even when other pipelines in the project have agent steps and there's no `llm:`. (`serve` / `mcp serve` still check the whole workspace.)
+- **Hand it to the agent:** `zymi mcp serve --dir ~/.zymi` exposes the library's `expose.mcp:` pipelines.
+- Keep `~/.zymi` in a private git repo; `.env` is gitignored by the scaffold.
+
+When the user wants to "turn this into a pipeline I can run myself", the default home for it is `~/.zymi`, not the repo they happen to be in.
 
 ## How to use this skill
 
@@ -73,6 +94,9 @@ Load references on demand, not all up front:
 
 | Need | Use |
 |---|---|
+| Personal procedure runnable from any terminal, even with no agent around | Tool-only pipeline in `~/.zymi` (`zymi init --home`), run with `zymi run <name>` |
+| Same LLM endpoint across several projects | `~/.zymi/providers.yml` + `llm: <name>` |
+| One pipeline, several actions (list / add / link …) | Router **tool** step that validates and prints a single-word action; branches `when: "${steps.route.output} == 'add'"`; `output: any_of:` |
 | Run a Python function from an agent | `@tool` in `tools/*.py` |
 | Hit one HTTP endpoint per pipeline | Declarative `kind: http` tool, _or_ inline tool step with `args:` |
 | Use a service that exposes N tools (Pinecone, filesystem, GitHub, …) | MCP server in `project.yml::mcp_servers:` — preferred over hand-rolling N tools |
@@ -127,6 +151,11 @@ Note: `web_search` and `web_scrape` are **not builtins**. The scaffold (under `t
 Anything else (Pinecone, GitHub, filesystem with full access, weather, translate, …) is something the user attaches via MCP, declarative tool, or `@tool`.
 
 ## Gotchas
+
+- **`when:` values are single tokens or single-quoted strings.** `${steps.r.output} == 'x'` breaks if the output has spaces; an optional input that may be empty must be quoted: `when: "'${inputs.clean}' == 'yes'"`. `when:` also needs a non-empty `depends_on:` — branch on inputs via a cheap router step.
+- **A disabled `policy:` means every shell command asks for approval.** For unattended tool-only pipelines enable it and list the commands in `allow:`; anything containing `$` (unresolved templates) also asks.
+- **Skipped optional inputs resolve to `""`** (≥0.9.1). Before 0.9.1 they stayed a literal `${inputs.x}`, which tripped the policy's variable-expansion check. Missing *required* inputs are still not validated by the engine — validate in a router step.
+- **Config errors print their cause** (≥0.9.1). On older versions a bare "invalid YAML in <path>" hid the real message (missing field, unset env var).
 
 - `zymi events` against a SQLite store can miss recent events stuck in the WAL — checkpoint with `sqlite3 .zymi/events.db 'PRAGMA wal_checkpoint(FULL);'`. `zymi observe` is unaffected (reads via the same writer). See references/troubleshooting.md.
 - MCP servers spawned with `npx -y …` re-resolve packages on every startup; a missed `init_timeout_secs` silently drops the server's tools from the catalog until the process restarts. Pin via global install.

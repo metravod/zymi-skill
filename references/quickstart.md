@@ -13,6 +13,18 @@ The Python package is `zymi-core`; the import is `zymi` (`from zymi import tool`
 
 Don't have `uv`? Install it once with `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or `irm https://astral.sh/uv/install.ps1 | iex` (Windows). `pip install zymi-core` into a traditional venv also works for contributor workflows, but `uv tool install` is what the shipped UX expects.
 
+## Personal library instead of a project (≥0.9.1)
+
+If the user wants procedures they can run from anywhere — ops chores, "the thing I keep asking the agent to do" — start with the home project rather than a repo-local one:
+
+```bash
+zymi init --home     # ~/.zymi: providers.yml, .env.example, tool-only `hello` example, enabled shell policy
+zymi ls              # from any directory that isn't itself a zymi project
+zymi run hello       # asks for `who`
+```
+
+Add pipelines under `~/.zymi/pipelines/`, scripts under `~/.zymi/scripts/` (shell tools run with cwd = project root), and allow their commands in `policy.allow`. Secrets in `~/.zymi/.env`. Details: SKILL.md "Home project".
+
 ## Scaffold a project
 
 ```bash

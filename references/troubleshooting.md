@@ -150,6 +150,18 @@ After the change, look for `ContextCompacted` events in the run — those confir
 
 **Fix.** Upgrade to ≥ 0.7.1. The first config pass is now env-only and **fails loudly**: a missing `${env.*}` is a hard error naming the variable and the file path. Set the variable (a `.env` file is picked up) or remove the dead reference. Note this pass only resolves `${env.*}` — `${var}`, `${project.*}`, `${inputs.*}` and other namespaces are still resolved in later passes and are unaffected.
 
+## `zymi run X` ran a different project than I expected
+
+Since 0.9.1, when the cwd has no `project.yml` the CLI falls back to the home project `~/.zymi` and says so on stderr (`zymi: no project.yml here — using home project …`). Pass `--dir` to be explicit, or `cd` into the project.
+
+## Agent step fails with "cannot resolve `llm:`", tool steps run fine
+
+The project names a provider (`llm: <name>`) that `~/.zymi/providers.yml` doesn't define, or whose `${env.*}` key is unset. That only disables agent steps — tool-only pipelines keep working by design. Fix the name, or put the key in `~/.zymi/.env`.
+
+## Every shell command asks for approval
+
+`policy:` is absent or `enabled: false` — a disabled policy means "approve everything". Enable it and list the commands in `allow:`. A command that still prompts usually contains a `$` from an unresolved template.
+
 ## "Tool returned not configured"
 
 **Symptom.** `web_search` or `web_scrape` returns `"not configured"` literal string and the agent often hallucinates around it.
